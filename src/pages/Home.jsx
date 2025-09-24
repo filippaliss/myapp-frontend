@@ -5,7 +5,7 @@ export default function Home() {
   const [docs, setDocs] = useState([]);
 
   useEffect(() => {
-    fetch("http://localhost:3001/api/docs")
+    fetch(`http://localhost:5000/documents`)
       .then(res => res.json())
       .then(data => setDocs(data));
   }, []);
