@@ -1,8 +1,9 @@
 {
-  "name": "my-app",
+  "name": "myapp-frontend",
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "hamepage": "https://filippaliss.github.io/myapp-frontend/",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -12,7 +13,6 @@
   "dependencies": {
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "react-router-dom": "^7.9.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
