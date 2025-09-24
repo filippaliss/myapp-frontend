@@ -8,9 +8,9 @@ export default function App() {
     <BrowserRouter>
       <Layout>
         <Routes>
-          <Route path="/myapp-frontend/" element={<Home />} />
-          <Route path="/myapp-frontend/new" element={<Doc />} />
-          <Route path="/myapp-frontend/doc/:id" element={<Doc />} />
+          <Route path="/" element={<Home />} />
+          <Route path="/new" element={<Doc />} />
+          <Route path="/doc/:id" element={<Doc />} />
         </Routes>
       </Layout>
     </BrowserRouter>
