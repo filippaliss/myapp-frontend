@@ -5,37 +5,65 @@ export default function Doc() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [doc, setDoc] = useState({ title: "", content: "" });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (id) {
-      fetch(`http://localhost:3001/api/docs/${id}`)
-        .then(res => res.json())
-        .then(data => setDoc(data));
+      setLoading(true);
+      fetch(`http://localhost:5000/documents/${id}`)
+        .then(res => {
+          if (!res.ok) throw new Error("Kunde inte hämta dokument");
+          return res.json();
+        })
+        .then(data => {
+          setDoc(data);
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error(err);
+          setError(err.message);
+          setLoading(false);
+        });
+    } else {
+      setLoading(false);
     }
   }, [id]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (id) {
-      await fetch(`http://localhost:3001/api/docs/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(doc)
-      });
-    } else {
-      const res = await fetch("http://localhost:3001/api/docs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(doc)
-      });
-      const data = await res.json();
-      navigate(`/doc/${data.id}`);
+    try {
+      if (id) {
+        const res = await fetch(`http://localhost:5000/documents/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(doc),
+        });
+        if (!res.ok) throw new Error("Kunde inte uppdatera dokument");
+        const updated = await res.json();
+        setDoc(updated);
+      } else {
+        const res = await fetch("http://localhost:5000/documents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(doc),
+        });
+        if (!res.ok) throw new Error("Kunde inte skapa dokument");
+        const data = await res.json();
+        navigate(`/doc/${data.id}`);
+      }
+    } catch (err) {
+      console.error(err);
+      setError(err.message);
     }
   };
 
+  if (loading) return <p>Laddar...</p>;
+  if (error) return <p>Fel: {error}</p>;
+
   return (
     <div>
-      <h2>Dokument</h2>
+      <h2>{id ? "Redigera dokument" : "Skapa nytt dokument"}</h2>
       <form onSubmit={handleSubmit}>
         <label htmlFor="title">Titel</label>
         <input
