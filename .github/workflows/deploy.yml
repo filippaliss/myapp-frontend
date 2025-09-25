@@ -12,10 +12,6 @@ permissions:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    env:
-      ATLAS_USERNAME: ${{ secrets.ATLAS_USERNAME }}
-      ATLAS_PASSWORD: ${{ secrets.ATLAS_PASSWORD }}
-      ATLAS_DB: ${{ secrets.ATLAS_DB }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
