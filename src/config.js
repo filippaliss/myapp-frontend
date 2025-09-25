@@ -1,6 +1,6 @@
 const API_BASE =
-  process.env.NODE_ENV === "development"
+  window.location.hostname === "localhost"
     ? "http://localhost:5000"
-    : "jsramverk-editor-lisd22.azurewebsites.net";
+    : "https://jsramverk-editor-lisd22.azurewebsites.net";
 
 export default API_BASE;
