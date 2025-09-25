@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import{ API_BASE } from "../config.js";
 
 export default function Doc() {
   const { id } = useParams();
@@ -11,7 +12,7 @@ export default function Doc() {
   useEffect(() => {
     if (id) {
       setLoading(true);
-      fetch(`http://localhost:5000/documents/${id}`)
+      fetch(`${API_BASE}/documents/${id}`)
         .then(res => {
           if (!res.ok) throw new Error("Kunde inte hämta dokument");
           return res.json();
@@ -34,7 +35,7 @@ export default function Doc() {
     e.preventDefault();
     try {
       if (id) {
-        const res = await fetch(`http://localhost:5000/documents/${id}`, {
+        const res = await fetch(`${API_BASE}/documents/${id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(doc),
@@ -43,7 +44,7 @@ export default function Doc() {
         const updated = await res.json();
         setDoc(updated);
       } else {
-        const res = await fetch("http://localhost:5000/documents", {
+        const res = await fetch(`${API_BASE}/documents/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(doc),
