@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import{ API_BASE } from "../config.js";
+import API_BASE from "../config.js";
 
 export default function Doc() {
   const { id } = useParams();
