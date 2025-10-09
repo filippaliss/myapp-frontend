@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import API_BASE from "../config.js";
+
 
 export default function Home() {
   const [docs, setDocs] = useState([]);
 
   useEffect(() => {
-    fetch(`http://localhost:5000/documents`)
+    fetch(`${API_BASE}/documents`)
       .then(res => res.json())
       .then(data => setDocs(data));
   }, []);
