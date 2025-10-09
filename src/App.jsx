@@ -5,7 +5,7 @@ import Layout from "./components/Layout";
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/myapp-frontend">
       <Layout>
         <Routes>
           <Route path="/" element={<Home />} />
