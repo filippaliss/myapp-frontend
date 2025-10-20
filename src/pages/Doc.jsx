@@ -9,50 +9,57 @@ export default function Doc() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const token = localStorage.getItem("token");
+
   useEffect(() => {
+    console.log("Id från URL:", id); // Här loggas id
     if (id) {
       setLoading(true);
-      fetch(`${API_BASE}/documents/${id}`)
-        .then(res => {
+      async function fetchDoc() {
+        try {
+          const res = await fetch(`${API_BASE}/documents/${id}`, {
+            headers: {
+              "Authorization": `Bearer ${token}`,
+            }
+          });
           if (!res.ok) throw new Error("Kunde inte hämta dokument");
-          return res.json();
-        })
-        .then(data => {
+          const data = await res.json();
           setDoc(data);
           setLoading(false);
-        })
-        .catch(err => {
+        } catch (err) {
           console.error(err);
           setError(err.message);
           setLoading(false);
-        });
+        }
+      }
+      fetchDoc();
     } else {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, token]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      if (id) {
-        const res = await fetch(`${API_BASE}/documents/${id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(doc),
-        });
-        if (!res.ok) throw new Error("Kunde inte uppdatera dokument");
-        const updated = await res.json();
-        setDoc(updated);
-      } else {
-        const res = await fetch(`${API_BASE}/documents/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(doc),
-        });
-        if (!res.ok) throw new Error("Kunde inte skapa dokument");
-        const data = await res.json();
-        navigate(`/doc/${data.id}`);
-      }
+      const method = id ? "PUT" : "POST";
+      const url = id
+        ? `${API_BASE}/documents/${id}`
+        : `${API_BASE}/documents/`;
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify(doc),
+      });
+
+      if (!res.ok) throw new Error("Kunde inte spara dokument");
+      const data = await res.json();
+
+      if (!id) navigate(`/doc/${data._id || data.id}`);
+      else setDoc(data);
     } catch (err) {
       console.error(err);
       setError(err.message);

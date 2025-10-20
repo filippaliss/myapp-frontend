@@ -65,6 +65,15 @@ h1, h2, h3 {
   margin-top: 0;
 }
 
+header nav {
+  margin-top: 0.5rem;
+}
+
+header nav a,
+header nav button {
+  margin: 0 0.5rem;
+}
+
 button, .button {
   display: inline-block;
   border-radius: var(--radius);
