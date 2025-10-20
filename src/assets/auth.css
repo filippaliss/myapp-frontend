@@ -1,0 +1,91 @@
+.auth-container {
+  max-width: 400px;
+  margin: 4rem auto;
+  padding: 2rem;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  text-align: left;
+}
+
+.auth-container h2 {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  color: var(--color-accent);
+}
+
+.auth-container form {
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-container label {
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+  color: var(--color-text-dark);
+}
+
+.auth-container input {
+  padding: 0.6rem;
+  border-radius: var(--radius);
+  border: 1px solid #444;
+  background: #2a2a3d;
+  color: var(--color-text-dark);
+  font-size: 1rem;
+  margin-bottom: var(--spacing);
+}
+
+.auth-container input:focus {
+  outline: 2px solid var(--color-accent);
+}
+
+.auth-container button {
+  background-color: var(--color-accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.6rem 1.2rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s ease-in-out;
+}
+
+.auth-container button:hover {
+  background-color: var(--color-accent-hover);
+}
+
+.auth-container p {
+  text-align: center;
+  margin-top: 1rem;
+}
+
+.auth-container a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.auth-container a:hover {
+  color: var(--color-accent-hover);
+}
+
+@media (prefers-color-scheme: light) {
+  .auth-container {
+    background: #f5f5f5;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  .auth-container input {
+    background: #fff;
+    border: 1px solid #ccc;
+    color: var(--color-text-light);
+  }
+
+  .auth-container label {
+    color: var(--color-text-light);
+  }
+
+  .auth-container button {
+    background-color: var(--color-accent);
+    color: #fff;
+  }
+}
