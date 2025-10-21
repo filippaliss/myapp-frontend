@@ -1,6 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { io } from "socket.io-client";
 import API_BASE from "../config.js";
+
+let socket;
 
 export default function Doc() {
   const { id } = useParams();
@@ -10,41 +13,76 @@ export default function Doc() {
   const [error, setError] = useState(null);
 
   const token = localStorage.getItem("token");
+  const SERVER_URL = "http://localhost:5000";
 
+  const typingTimeout = useRef(null);
+
+  // --- Fetch document ---
   useEffect(() => {
-    console.log("Id från URL:", id); // Här loggas id
-    if (id) {
-      setLoading(true);
-      async function fetchDoc() {
-        try {
-          const res = await fetch(`${API_BASE}/documents/${id}`, {
-            headers: {
-              "Authorization": `Bearer ${token}`,
-            }
-          });
-          if (!res.ok) throw new Error("Kunde inte hämta dokument");
-          const data = await res.json();
-          setDoc(data);
-          setLoading(false);
-        } catch (err) {
-          console.error(err);
-          setError(err.message);
-          setLoading(false);
-        }
-      }
-      fetchDoc();
-    } else {
+    if (!id) {
       setLoading(false);
+      return;
     }
+
+    setLoading(true);
+    async function fetchDoc() {
+      try {
+        const res = await fetch(`${API_BASE}/documents/${id}`, {
+          headers: { "Authorization": `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error("Kunde inte hämta dokument");
+        const data = await res.json();
+        setDoc(data);
+        setLoading(false);
+      } catch (err) {
+        console.error(err);
+        setError(err.message);
+        setLoading(false);
+      }
+    }
+
+    fetchDoc();
   }, [id, token]);
 
+  // --- Socket.IO setup ---
+  useEffect(() => {
+    if (!id) return;
+
+    socket = io(SERVER_URL);
+
+    socket.on("connect", () => {
+      console.log("Connected to Socket.IO, joining room:", id);
+      socket.emit("create", id);
+    });
+
+    socket.on("doc", (data) => {
+      console.log("Received update:", data);
+      setDoc(prev => ({ ...prev, content: data.html }));
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [id]);
+
+  // --- Handle live typing with debounce ---
+  const handleContentChange = (e) => {
+    const newContent = e.target.value;
+    setDoc(prev => ({ ...prev, content: newContent }));
+
+    if (typingTimeout.current) clearTimeout(typingTimeout.current);
+
+    typingTimeout.current = setTimeout(() => {
+      socket.emit("doc", { _id: id, html: newContent });
+    }, 300);
+  };
+
+  // --- Handle form submission ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       const method = id ? "PUT" : "POST";
-      const url = id
-        ? `${API_BASE}/documents/${id}`
-        : `${API_BASE}/documents/`;
+      const url = id ? `${API_BASE}/documents/${id}` : `${API_BASE}/documents/`;
 
       const res = await fetch(url, {
         method,
@@ -58,8 +96,13 @@ export default function Doc() {
       if (!res.ok) throw new Error("Kunde inte spara dokument");
       const data = await res.json();
 
-      if (!id) navigate(`/doc/${data._id || data.id}`);
-      else setDoc(data);
+      if (!id) {
+        navigate(`/doc/${data._id || data.id}`);
+        socket.emit("create", data._id); // join room for new doc
+      } else {
+        setDoc(data);
+        socket.emit("create", data._id); // re-join room just in case
+      }
     } catch (err) {
       console.error(err);
       setError(err.message);
@@ -85,7 +128,7 @@ export default function Doc() {
         <textarea
           name="content"
           value={doc.content}
-          onChange={(e) => setDoc({ ...doc, content: e.target.value })}
+          onChange={handleContentChange}
         />
 
         <button type="submit">{id ? "Uppdatera" : "Skapa"}</button>
