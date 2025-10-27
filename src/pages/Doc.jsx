@@ -13,7 +13,11 @@ export default function Doc() {
   const [error, setError] = useState(null);
 
   const token = localStorage.getItem("token");
-  const SERVER_URL = "http://localhost:5000";
+  const SERVER_URL =
+    window.location.hostname === "localhost"
+      ? "http://localhost:5000"
+      : "https://jsramverk-editor-lisd22.azurewebsites.net";
+
 
   const typingTimeout = useRef(null);
 
@@ -46,24 +50,30 @@ export default function Doc() {
 
   // --- Socket.IO setup ---
   useEffect(() => {
-    if (!id) return;
+  if (!id) return;
 
-    socket = io(SERVER_URL);
+  socket = io(SERVER_URL, {
+    withCredentials: true,
+  });
 
-    socket.on("connect", () => {
-      console.log("Connected to Socket.IO, joining room:", id);
-      socket.emit("create", id);
-    });
+  socket.on("connect", () => {
+    console.log("✅ Connected to Socket.IO, joining room:", id);
+    socket.emit("create", id);
+  });
 
-    socket.on("doc", (data) => {
-      console.log("Received update:", data);
-      setDoc(prev => ({ ...prev, content: data.html }));
-    });
+  socket.on("connect_error", (err) => {
+    console.error("❌ Socket connection error:", err.message);
+  });
 
-    return () => {
-      socket.disconnect();
-    };
-  }, [id]);
+  socket.on("doc", (data) => {
+    console.log("📄 Received update:", data);
+    setDoc(prev => ({ ...prev, content: data.html }));
+  });
+
+  return () => {
+    socket.disconnect();
+  };
+}, [id]);
 
   // --- Handle live typing with debounce ---
   const handleContentChange = (e) => {
