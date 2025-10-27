@@ -11,6 +11,8 @@ export default function Doc() {
   const [doc, setDoc] = useState({ title: "", content: "" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteStatus, setInviteStatus] = useState(null);
 
   const token = localStorage.getItem("token");
   const SERVER_URL = "http://localhost:5000";
@@ -109,12 +111,41 @@ export default function Doc() {
     }
   };
 
+  //funktion: skicka inbjudan
+  const handleInvite = async (e) => {
+    e.preventDefault();
+    if (!inviteEmail) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/invitations`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ email: inviteEmail, documentId: id }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setInviteStatus("✅ Inbjudan skickad till " + inviteEmail);
+        setInviteEmail("");
+      } else {
+        throw new Error(data.error || "Kunde inte skicka inbjudan");
+      }
+    } catch (err) {
+      console.error(err);
+      setInviteStatus("❌ " + err.message);
+    }
+  };
+
   if (loading) return <p>Laddar...</p>;
   if (error) return <p>Fel: {error}</p>;
 
   return (
     <div>
       <h2>{id ? "Redigera dokument" : "Skapa nytt dokument"}</h2>
+
       <form onSubmit={handleSubmit}>
         <label htmlFor="title">Titel</label>
         <input
@@ -133,6 +164,24 @@ export default function Doc() {
 
         <button type="submit">{id ? "Uppdatera" : "Skapa"}</button>
       </form>
+
+      {/* 🔹 Inbjudningsformulär */}
+      {id && (
+        <div style={{ marginTop: "2rem" }}>
+          <h3>Bjud in redigerare</h3>
+          <form onSubmit={handleInvite}>
+            <input
+              type="email"
+              placeholder="E-postadress"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              required
+            />
+            <button type="submit">Skicka inbjudan</button>
+          </form>
+          {inviteStatus && <p>{inviteStatus}</p>}
+        </div>
+      )}
     </div>
   );
 }
