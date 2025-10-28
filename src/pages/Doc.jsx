@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { io } from "socket.io-client";
 import API_BASE from "../config.js";
 
@@ -8,18 +8,23 @@ let socket;
 export default function Doc() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [doc, setDoc] = useState({ title: "", content: "" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteStatus, setInviteStatus] = useState(null);
 
+  // --- Hämta token ---
   const token = localStorage.getItem("token");
+  const urlParams = new URLSearchParams(location.search);
+  const inviteToken = urlParams.get("invite");
+  const authToken = inviteToken || token;
+
   const SERVER_URL =
     window.location.hostname === "localhost"
       ? "http://localhost:5000"
       : "https://jsramverk-editor-lisd22.azurewebsites.net";
-
 
   const typingTimeout = useRef(null);
 
@@ -34,7 +39,7 @@ export default function Doc() {
     async function fetchDoc() {
       try {
         const res = await fetch(`${API_BASE}/documents/${id}`, {
-          headers: { "Authorization": `Bearer ${token}` },
+          headers: { "Authorization": `Bearer ${authToken}` },
         });
         if (!res.ok) throw new Error("Kunde inte hämta dokument");
         const data = await res.json();
@@ -48,34 +53,35 @@ export default function Doc() {
     }
 
     fetchDoc();
-  }, [id, token]);
+  }, [id, authToken]);
 
   // --- Socket.IO setup ---
   useEffect(() => {
-  if (!id) return;
+    if (!id) return;
 
-  socket = io(SERVER_URL, {
-    withCredentials: true,
-  });
+    socket = io(SERVER_URL, {
+      withCredentials: true,
+      auth: { token: authToken }, // skicka token till backend
+    });
 
-  socket.on("connect", () => {
-    console.log("✅ Connected to Socket.IO, joining room:", id);
-    socket.emit("create", id);
-  });
+    socket.on("connect", () => {
+      console.log("✅ Connected to Socket.IO, joining room:", id);
+      socket.emit("create", id);
+    });
 
-  socket.on("connect_error", (err) => {
-    console.error("❌ Socket connection error:", err.message);
-  });
+    socket.on("connect_error", (err) => {
+      console.error("❌ Socket connection error:", err.message);
+    });
 
-  socket.on("doc", (data) => {
-    console.log("📄 Received update:", data);
-    setDoc(prev => ({ ...prev, content: data.html }));
-  });
+    socket.on("doc", (data) => {
+      console.log("📄 Received update:", data);
+      setDoc(prev => ({ ...prev, content: data.html }));
+    });
 
-  return () => {
-    socket.disconnect();
-  };
-}, [id]);
+    return () => {
+      socket.disconnect();
+    };
+  }, [id, authToken]);
 
   // --- Handle live typing with debounce ---
   const handleContentChange = (e) => {
@@ -100,7 +106,7 @@ export default function Doc() {
         method,
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+          "Authorization": `Bearer ${authToken}`,
         },
         body: JSON.stringify(doc),
       });
@@ -121,7 +127,7 @@ export default function Doc() {
     }
   };
 
-  //funktion: skicka inbjudan
+  // --- Funktion: skicka inbjudan ---
   const handleInvite = async (e) => {
     e.preventDefault();
     if (!inviteEmail) return;
@@ -131,7 +137,7 @@ export default function Doc() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+          "Authorization": `Bearer ${token}`, // bara admin-token
         },
         body: JSON.stringify({ email: inviteEmail, documentId: id }),
       });
