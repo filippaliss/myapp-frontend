@@ -1,56 +1,112 @@
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useState, useRef } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { io } from "socket.io-client";
 import API_BASE from "../config.js";
+
+let socket;
 
 export default function Doc() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [doc, setDoc] = useState({ title: "", content: "" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteStatus, setInviteStatus] = useState(null);
 
+  // --- Hämta token ---
   const token = localStorage.getItem("token");
+  const urlParams = new URLSearchParams(location.search);
+  const inviteToken = urlParams.get("invite");
+  const authToken = inviteToken || token;
 
+  const SERVER_URL =
+    window.location.hostname === "localhost"
+      ? "http://localhost:5000"
+      : "https://jsramverk-editor-lisd22.azurewebsites.net";
+
+  const typingTimeout = useRef(null);
+
+  // --- Fetch document ---
   useEffect(() => {
-    console.log("Id från URL:", id); // Här loggas id
-    if (id) {
-      setLoading(true);
-      async function fetchDoc() {
-        try {
-          const res = await fetch(`${API_BASE}/documents/${id}`, {
-            headers: {
-              "Authorization": `Bearer ${token}`,
-            }
-          });
-          if (!res.ok) throw new Error("Kunde inte hämta dokument");
-          const data = await res.json();
-          setDoc(data);
-          setLoading(false);
-        } catch (err) {
-          console.error(err);
-          setError(err.message);
-          setLoading(false);
-        }
-      }
-      fetchDoc();
-    } else {
+    if (!id) {
       setLoading(false);
+      return;
     }
-  }, [id, token]);
 
+    setLoading(true);
+    async function fetchDoc() {
+      try {
+        const res = await fetch(`${API_BASE}/documents/${id}`, {
+          headers: { "Authorization": `Bearer ${authToken}` },
+        });
+        if (!res.ok) throw new Error("Kunde inte hämta dokument");
+        const data = await res.json();
+        setDoc(data);
+        setLoading(false);
+      } catch (err) {
+        console.error(err);
+        setError(err.message);
+        setLoading(false);
+      }
+    }
+
+    fetchDoc();
+  }, [id, authToken]);
+
+  // --- Socket.IO setup ---
+  useEffect(() => {
+    if (!id) return;
+
+    socket = io(SERVER_URL, {
+      withCredentials: true,
+      auth: { token: authToken }, // skicka token till backend
+    });
+
+    socket.on("connect", () => {
+      console.log("✅ Connected to Socket.IO, joining room:", id);
+      socket.emit("create", id);
+    });
+
+    socket.on("connect_error", (err) => {
+      console.error("❌ Socket connection error:", err.message);
+    });
+
+    socket.on("doc", (data) => {
+      console.log("📄 Received update:", data);
+      setDoc(prev => ({ ...prev, content: data.html }));
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [id, authToken]);
+
+  // --- Handle live typing with debounce ---
+  const handleContentChange = (e) => {
+    const newContent = e.target.value;
+    setDoc(prev => ({ ...prev, content: newContent }));
+
+    if (typingTimeout.current) clearTimeout(typingTimeout.current);
+
+    typingTimeout.current = setTimeout(() => {
+      socket.emit("doc", { _id: id, html: newContent });
+    }, 300);
+  };
+
+  // --- Handle form submission ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       const method = id ? "PUT" : "POST";
-      const url = id
-        ? `${API_BASE}/documents/${id}`
-        : `${API_BASE}/documents/`;
+      const url = id ? `${API_BASE}/documents/${id}` : `${API_BASE}/documents/`;
 
       const res = await fetch(url, {
         method,
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+          "Authorization": `Bearer ${authToken}`,
         },
         body: JSON.stringify(doc),
       });
@@ -58,11 +114,44 @@ export default function Doc() {
       if (!res.ok) throw new Error("Kunde inte spara dokument");
       const data = await res.json();
 
-      if (!id) navigate(`/doc/${data._id || data.id}`);
-      else setDoc(data);
+      if (!id) {
+        navigate(`/doc/${data._id || data.id}`);
+        socket.emit("create", data._id); // join room for new doc
+      } else {
+        setDoc(data);
+        socket.emit("create", data._id); // re-join room just in case
+      }
     } catch (err) {
       console.error(err);
       setError(err.message);
+    }
+  };
+
+  // --- Funktion: skicka inbjudan ---
+  const handleInvite = async (e) => {
+    e.preventDefault();
+    if (!inviteEmail) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/invitations`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`, // bara admin-token
+        },
+        body: JSON.stringify({ email: inviteEmail, documentId: id }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setInviteStatus("✅ Inbjudan skickad till " + inviteEmail);
+        setInviteEmail("");
+      } else {
+        throw new Error(data.error || "Kunde inte skicka inbjudan");
+      }
+    } catch (err) {
+      console.error(err);
+      setInviteStatus("❌ " + err.message);
     }
   };
 
@@ -72,6 +161,7 @@ export default function Doc() {
   return (
     <div>
       <h2>{id ? "Redigera dokument" : "Skapa nytt dokument"}</h2>
+
       <form onSubmit={handleSubmit}>
         <label htmlFor="title">Titel</label>
         <input
@@ -85,11 +175,29 @@ export default function Doc() {
         <textarea
           name="content"
           value={doc.content}
-          onChange={(e) => setDoc({ ...doc, content: e.target.value })}
+          onChange={handleContentChange}
         />
 
         <button type="submit">{id ? "Uppdatera" : "Skapa"}</button>
       </form>
+
+      {/* 🔹 Inbjudningsformulär */}
+      {id && (
+        <div style={{ marginTop: "2rem" }}>
+          <h3>Bjud in redigerare</h3>
+          <form onSubmit={handleInvite}>
+            <input
+              type="email"
+              placeholder="E-postadress"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              required
+            />
+            <button type="submit">Skicka inbjudan</button>
+          </form>
+          {inviteStatus && <p>{inviteStatus}</p>}
+        </div>
+      )}
     </div>
   );
 }
