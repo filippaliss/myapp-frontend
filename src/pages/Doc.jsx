@@ -132,25 +132,40 @@ export default function Doc() {
     e.preventDefault();
     if (!inviteEmail) return;
 
+    setInviteStatus("📨 Skickar inbjudan...");
+
     try {
       const res = await fetch(`${API_BASE}/invitations`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`, // bara admin-token
+          "Authorization": `Bearer ${token}`, // admin-token
         },
         body: JSON.stringify({ email: inviteEmail, documentId: id }),
       });
 
+      if (!res.ok) throw new Error(`Serverfel (${res.status})`);
+
       const data = await res.json();
-      if (data.success) {
-        setInviteStatus("✅ Inbjudan skickad till " + inviteEmail);
+
+      if (data.success && data.status === "queued") {
+        // Visa queued-status direkt
+        setInviteStatus(`⚙️ Inbjudan bearbetas och kommer att skickas till ${inviteEmail}`);
+        setInviteEmail("");
+
+        // Byt till skickad efter 1 minut
+        setTimeout(() => {
+          setInviteStatus(`✅ Inbjudan skickad till ${inviteEmail}`);
+        }, 60 * 1000); // 60 sekunder
+      } else if (data.success) {
+        setInviteStatus(`✅ Inbjudan skickad till ${inviteEmail}`);
         setInviteEmail("");
       } else {
         throw new Error(data.error || "Kunde inte skicka inbjudan");
       }
+
     } catch (err) {
-      console.error(err);
+      console.error("❌ Fel vid inbjudan:", err);
       setInviteStatus("❌ " + err.message);
     }
   };
