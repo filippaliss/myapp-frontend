@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { HashRouter, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import Doc from "./pages/Doc";
 import Layout from "./components/Layout";
@@ -7,7 +7,7 @@ import Register from "./pages/Register";
 
 export default function App() {
   return (
-    <BrowserRouter basename="/myapp-frontend">
+    <HashRouter basename="/myapp-frontend">
       <Layout>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -17,6 +17,6 @@ export default function App() {
           <Route path="/doc/:id" element={<Doc />} />
         </Routes>
       </Layout>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
