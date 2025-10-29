@@ -55,10 +55,6 @@ export default function Login() {
         />
         <button type="submit">Logga in</button>
       </form>
-      <p>
-        Har du inget konto?{" "}
-        <a href="/myapp-frontend/register">Registrera dig här</a>
-      </p>
     </div>
   );
 }
