@@ -14,6 +14,10 @@ export default function Doc() {
   const [error, setError] = useState(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteStatus, setInviteStatus] = useState(null);
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState("");
+  const [currentLine, setCurrentLine] = useState(1);
+  const textareaRef = useRef(null);
 
   // --- Hämta token ---
   const token = localStorage.getItem("token"); // ← behåll för inbjudningar
@@ -76,10 +80,46 @@ export default function Doc() {
       setDoc(prev => ({ ...prev, content: data.html }));
     });
 
+    // NYTT: lyssna på kommentarer i realtid
+    socket.on("comment", (comment) => {
+      setComments(prev => [...prev, comment]);
+    });
+
     return () => {
       socket.disconnect();
     };
   }, [id, authToken]);
+
+  // --- Hämta befintliga kommentarer initialt ---
+  useEffect(() => {
+    if (!id) return;
+    async function fetchComments() {
+      try {
+        const res = await fetch(`${API_BASE}/documents/${id}/comments`, {
+          headers: { "Authorization": `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setComments(data);
+        } else {
+          console.warn("Kunde inte hämta kommentarer");
+        }
+      } catch (err) {
+        console.error("Fel vid hämtning av kommentarer:", err);
+      }
+    }
+    fetchComments();
+  }, [id, token]);
+
+  // --- Räkna ut aktuell rad i textarea ---
+  function updateCurrentLine() {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const pos = ta.selectionStart || 0;
+    const before = ta.value.slice(0, pos);
+    const line = before.split("\n").length;
+    setCurrentLine(line);
+  }
 
   // --- Handle live typing with debounce ---
   const handleContentChange = (e) => {
@@ -168,49 +208,111 @@ export default function Doc() {
     }
   };
 
+  // --- Lägg till kommentar ---
+  const handleAddComment = (e) => {
+    e.preventDefault();
+    if (!newComment.trim()) return;
+
+    const comment = {
+      documentId: id,
+      lineNumber: currentLine,
+      content: newComment,
+      author: token ? "Användare" : "Anonymous",
+    };
+
+    // Skicka via socket (server sparar och broadcastar)
+    socket.emit("comment", comment);
+
+    setNewComment("");
+  };
+
   if (loading) return <p>Laddar...</p>;
   if (error) return <p>Fel: {error}</p>;
 
   return (
-    <div>
-      <h2>{id ? "Redigera dokument" : "Skapa nytt dokument"}</h2>
+    <div style={{ display: "flex", gap: "2rem", alignItems: "flex-start" }}>
+      <div style={{ flex: 1 }}>
+        <h2>{id ? "Redigera dokument" : "Skapa nytt dokument"}</h2>
 
-      <form onSubmit={handleSubmit}>
-        <label htmlFor="title">Titel</label>
-        <input
-          type="text"
-          name="title"
-          value={doc.title}
-          onChange={(e) => setDoc({ ...doc, title: e.target.value })}
-        />
+        <form onSubmit={handleSubmit}>
+          <label htmlFor="title">Titel</label>
+          <input
+            type="text"
+            name="title"
+            value={doc.title}
+            onChange={(e) => setDoc({ ...doc, title: e.target.value })}
+          />
 
-        <label htmlFor="content">Innehåll</label>
-        <textarea
-          name="content"
-          value={doc.content}
-          onChange={handleContentChange}
-        />
+          <label htmlFor="content">Innehåll</label>
+          <textarea
+            name="content"
+            ref={textareaRef}
+            value={doc.content}
+            onChange={handleContentChange}
+            onClick={updateCurrentLine}
+            onKeyUp={updateCurrentLine}
+            onMouseUp={updateCurrentLine}
+            rows={15}
+          />
 
-        <button type="submit">{id ? "Uppdatera" : "Skapa"}</button>
-      </form>
+          <button type="submit">{id ? "Uppdatera" : "Skapa"}</button>
+        </form>
 
-      {/* 🔹 Inbjudningsformulär */}
-      {id && (
-        <div style={{ marginTop: "2rem" }}>
-          <h3>Bjud in redigerare</h3>
-          <form onSubmit={handleInvite}>
-            <input
-              type="email"
-              placeholder="E-postadress"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              required
-            />
-            <button type="submit">Skicka inbjudan</button>
-          </form>
-          {inviteStatus && <p>{inviteStatus}</p>}
+        {/* 🔹 Inbjudningsformulär */}
+        {id && (
+          <div style={{ marginTop: "2rem" }}>
+            <h3>Bjud in redigerare</h3>
+            <form onSubmit={handleInvite}>
+              <input
+                type="email"
+                placeholder="E-postadress"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                required
+              />
+              <button type="submit">Skicka inbjudan</button>
+            </form>
+            {inviteStatus && <p>{inviteStatus}</p>}
+          </div>
+        )}
+      </div>
+
+      {/* Kommentarspanel (tilläggsfunktion) */}
+      <aside style={{
+        width: 320,
+        padding: "1rem",
+        background: "rgba(255,255,255,0.03)",
+        borderRadius: 8,
+        border: "1px solid rgba(255,255,255,0.04)"
+      }}>
+        <h3>Kommentarer</h3>
+        <p>Aktuell rad: {currentLine}</p>
+
+        <div style={{ maxHeight: 300, overflowY: "auto", marginBottom: "1rem" }}>
+          {comments.length === 0 && <p>Inga kommentarer än</p>}
+          {comments
+            .filter(c => c.lineNumber === currentLine)
+            .map(c => (
+              <div key={c.id || c._id} style={{ padding: "0.5rem", marginBottom: "0.5rem", background: "#111", borderRadius: 6 }}>
+                <div style={{ fontSize: "0.9rem", color: "#aaa" }}>
+                  <strong>{c.author}</strong> <span style={{ marginLeft: 8, fontSize: "0.8rem" }}>{new Date(c.timestamp).toLocaleString()}</span>
+                </div>
+                <div style={{ marginTop: 6 }}>{c.content}</div>
+                <div style={{ fontSize: "0.8rem", color: "#888", marginTop: 6 }}>Rad {c.lineNumber}</div>
+              </div>
+            ))}
         </div>
-      )}
+
+        <form onSubmit={handleAddComment}>
+          <input
+            type="text"
+            placeholder="Skriv kommentar för aktuell rad..."
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+          />
+          <button type="submit" style={{ marginTop: 8 }}>Skicka</button>
+        </form>
+      </aside>
     </div>
   );
 }
