@@ -4,17 +4,18 @@
     <meta charset="utf-8" />
     <title>Redirecting...</title>
     <script type="text/javascript">
-      /*
-       * SPA redirect for GitHub Pages (rafgraph/spa-github-pages)
-       * Anpassat för basename "/myapp-frontend" → segmentCount = 1
-       */
-      var segmentCount = 1;
+      var segmentCount = 1; // eftersom /myapp-frontend är 1 segment
 
       var l = window.location;
-      var redirectUrl = l.protocol + "//" + l.hostname + (l.port ? ":" + l.port : "") +
-        l.pathname.split("/").slice(0, 1 + segmentCount).join("/") +
-        "/?p=/" + l.pathname.slice(1 + segmentCount).split("/").join("/") +
-        (l.search ? "&" + l.search.slice(1) : "") + l.hash;
+
+      // Plocka ut basen (/myapp-frontend)
+      var basePath = "/" + l.pathname.split("/")[1];
+
+      // Resten efter basename
+      var restPath = l.pathname.slice(basePath.length);
+
+      // Redirect till ?p=restPath
+      var redirectUrl = l.protocol + "//" + l.host + basePath + "/?p=" + restPath + (l.search ? "&" + l.search.slice(1) : "") + l.hash;
 
       window.location.replace(redirectUrl);
     </script>
