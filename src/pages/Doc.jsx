@@ -16,10 +16,8 @@ export default function Doc() {
   const [inviteStatus, setInviteStatus] = useState(null);
 
   // --- Hämta token ---
-  const token = localStorage.getItem("token");
-  const urlParams = new URLSearchParams(location.search);
-  const inviteToken = urlParams.get("invite");
-  const authToken = inviteToken || token;
+  const token = localStorage.getItem("token"); // ← behåll för inbjudningar
+  const authToken = token; // bara vanlig auth, ingen invite-token
 
   const SERVER_URL =
     window.location.hostname === "localhost"
