@@ -87,11 +87,6 @@ export default function Register() {
       </form>
 
       {error && <p style={{ color: "red" }}>{error}</p>}
-
-      <p>
-        Har du redan ett konto?{" "}
-        <a href="/myapp-frontend/login">Logga in här</a>
-      </p>
     </div>
   );
 }

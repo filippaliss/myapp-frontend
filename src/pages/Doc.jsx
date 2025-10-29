@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { io } from "socket.io-client";
 import API_BASE from "../config.js";
 
@@ -8,6 +8,7 @@ let socket;
 export default function Doc() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [doc, setDoc] = useState({ title: "", content: "" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -18,12 +19,14 @@ export default function Doc() {
   const [currentLine, setCurrentLine] = useState(1);
   const textareaRef = useRef(null);
 
-  const token = localStorage.getItem("token");
+  // --- Hämta token ---
+  const token = localStorage.getItem("token"); // ← behåll för inbjudningar
+  const authToken = token; // bara vanlig auth, ingen invite-token
+
   const SERVER_URL =
     window.location.hostname === "localhost"
       ? "http://localhost:5000"
       : "https://jsramverk-editor-lisd22.azurewebsites.net";
-
 
   const typingTimeout = useRef(null);
 
@@ -38,7 +41,7 @@ export default function Doc() {
     async function fetchDoc() {
       try {
         const res = await fetch(`${API_BASE}/documents/${id}`, {
-          headers: { "Authorization": `Bearer ${token}` },
+          headers: { "Authorization": `Bearer ${authToken}` },
         });
         if (!res.ok) throw new Error("Kunde inte hämta dokument");
         const data = await res.json();
@@ -52,7 +55,7 @@ export default function Doc() {
     }
 
     fetchDoc();
-  }, [id, token]);
+  }, [id, authToken]);
 
   // --- Socket.IO setup ---
   useEffect(() => {
@@ -60,6 +63,7 @@ export default function Doc() {
 
     socket = io(SERVER_URL, {
       withCredentials: true,
+      auth: { token: authToken }, // skicka token till backend
     });
 
     socket.on("connect", () => {
@@ -84,7 +88,7 @@ export default function Doc() {
     return () => {
       socket.disconnect();
     };
-  }, [id]);
+  }, [id, authToken]);
 
   // --- Hämta befintliga kommentarer initialt ---
   useEffect(() => {
@@ -140,7 +144,7 @@ export default function Doc() {
         method,
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+          "Authorization": `Bearer ${authToken}`,
         },
         body: JSON.stringify(doc),
       });
@@ -161,30 +165,45 @@ export default function Doc() {
     }
   };
 
-  //funktion: skicka inbjudan
+  // --- Funktion: skicka inbjudan ---
   const handleInvite = async (e) => {
     e.preventDefault();
     if (!inviteEmail) return;
+
+    setInviteStatus("📨 Skickar inbjudan...");
 
     try {
       const res = await fetch(`${API_BASE}/invitations`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+          "Authorization": `Bearer ${token}`, // admin-token
         },
         body: JSON.stringify({ email: inviteEmail, documentId: id }),
       });
 
+      if (!res.ok) throw new Error(`Serverfel (${res.status})`);
+
       const data = await res.json();
-      if (data.success) {
-        setInviteStatus("✅ Inbjudan skickad till " + inviteEmail);
+
+      if (data.success && data.status === "queued") {
+        // Visa queued-status direkt
+        setInviteStatus(`⚙️ Inbjudan bearbetas och kommer att skickas till ${inviteEmail}`);
+        setInviteEmail("");
+
+        // Byt till skickad efter 1 minut
+        setTimeout(() => {
+          setInviteStatus(`✅ Inbjudan skickad till ${inviteEmail}`);
+        }, 60 * 1000); // 60 sekunder
+      } else if (data.success) {
+        setInviteStatus(`✅ Inbjudan skickad till ${inviteEmail}`);
         setInviteEmail("");
       } else {
         throw new Error(data.error || "Kunde inte skicka inbjudan");
       }
+
     } catch (err) {
-      console.error(err);
+      console.error("❌ Fel vid inbjudan:", err);
       setInviteStatus("❌ " + err.message);
     }
   };
